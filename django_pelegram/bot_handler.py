@@ -1,4 +1,4 @@
-from pelegram.telegram import TelegramApi
+from django_pelegram.telegram import TelegramApi
 import re
 from django.http import JsonResponse
 
