@@ -48,15 +48,14 @@ class BotBasic(object):
     def __init__(self, payload, bot_token):
         self.telegram_api = TelegramApi(bot_token)
         self.request = Request(payload)
-        self.check_command()
         self.allow_access = self.check_access(self.request.data['user'])
 
-    def check_command(self):
+    def get_command(self):
         re_command = re.match(r'^/\w+', self.request.data['text'])
-        self.command = ""
+        command = ""
         if re_command:
-            self.command = "bot_" + re_command.group().replace('/', '')
-        self.has_requested_command = getattr(self, self.command, None)
+            command = re_command.group().replace('/', '')
+        return command
 
     def send_message(self, message):
         self.telegram_api.send_message(self.request.data['chat_id'], message)
