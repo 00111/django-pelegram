@@ -48,7 +48,6 @@ class BotBasic(object):
     def __init__(self, payload, bot_token):
         self.telegram_api = TelegramApi(bot_token)
         self.request = Request(payload)
-        self.allow_access = self.check_access(self.request.data['user'])
 
     def get_command(self):
         re_command = re.match(r'^/\w+', self.request.data['text'])
@@ -87,8 +86,3 @@ class BotBasic(object):
                 methods.append("/{0} - {1}".format(attr.replace('bot_', ''), method.__doc__.strip(' \t\n\r')))
         return methods
 
-    def check_access(self, from_id):
-        return False if from_id != 199965779 else True
-
-    def access_denied(self):
-        self.send_message("Access denied")
