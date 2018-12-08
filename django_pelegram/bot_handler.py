@@ -45,7 +45,7 @@ class Request(object):
 
 class BotBasic(object):
 
-    def __init__(self, payload, bot_token):
+    def __init__(self, payload=None, bot_token=None):
         self.telegram_api = TelegramApi(bot_token)
         self.request = Request(payload)
 
