@@ -19,19 +19,3 @@ class TelegramApi(object):
     def log(self, data):
         if self.use_logging:
             self.logger.info(data)
-
-    def send_message(self, chat_id, message):
-        self.request("sendMessage", data={"chat_id": chat_id, "text": message})
-
-    def send_photo(self, chat_id, file_path):
-        files = {'photo': open(file_path, 'rb')}
-        self.request("sendPhoto", data={"chat_id": chat_id}, files=files)
-
-    def send_message_inline(self, chat_id, message, callback_query_id=False):
-        keyboard = {"inline_keyboard": message['keyboard']}
-        self.request("sendMessage",
-                     data={"chat_id": chat_id, "text": message['text'], "reply_markup": json.dumps(keyboard)})
-        if callback_query_id:
-            self.request("answerCallbackQuery",
-                         data={"callback_query_id": callback_query_id,
-                               "text": "{0} processed".format(message['called_name'])})

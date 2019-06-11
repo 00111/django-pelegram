@@ -46,10 +46,19 @@ class Request(object):
         return data
 
 
-class Response(object):
+class Answer(object):
 
     def __init__(self):
-        self._data = {"method": None, "body": None}
+        self._data = {}
+        self._action = None
+
+    @property
+    def action(self):
+        return self._action
+
+    @action.setter
+    def action(self, action_name):
+        self._action = action_name
 
     @property
     def data(self):
@@ -57,8 +66,7 @@ class Response(object):
 
     @data.setter
     def data(self, params):
-        self._data['method'] = params['method']
-        self._data['body'] = params['body']
+        self._data = params
 
 
 class BotBasic(object):
@@ -66,7 +74,7 @@ class BotBasic(object):
     def __init__(self, payload=None, bot_token=None):
         self.telegram_api = TelegramApi(bot_token)
         self.request = Request(payload)
-        self.response = Response()
+        self.answer = Answer()
 
     def get_command(self):
         re_command = re.match(r'^/\w+', self.request.data['text'])
@@ -75,25 +83,43 @@ class BotBasic(object):
             command = re_command.group().replace('/', '')
         return command
 
-    def send_message(self, message):
-        self.telegram_api.send_message(self.request.data['chat_id'], message)
-
-    def send_message_inline(self, message):
-        if self.request.data['type'] == 'callback_query':
-            self.telegram_api.send_message_inline(self.request.data['chat_id'], message,
-                                                  self.request.data['callback_query_id'])
-        else:
-            self.telegram_api.send_message_inline(self.request.data['chat_id'], message)
-
-    def send_photo(self, file_path):
-        self.telegram_api.send_photo(self.request.data['chat_id'], file_path)
+    def prepare_request_data(self, **kwargs):
+        return dict(**kwargs)
 
     def dont_understand_message(self):
         return "Bot don't understand your command ¯\_(ツ)_/"
 
-    def json_response(self, data={}, status=200):
+    def json_response(self, data, status=200):
         return JsonResponse(data, status=status)
 
-    def exception_occurred(self, err):
-        self.send_message("Run-time error:{0}".format(err))
+    def exception_template(self, err):
+        return "Run-time error:\n{0}\n\nDELETE THIS OUTPUT FROM PRODUCTION!\n".format(err)
 
+    def send_message(self):
+        """
+
+        requirement:
+        message
+
+        """
+        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
+                                                      **self.answer.data['message'])
+        self.telegram_api.request("sendMessage", data=send_message_data)
+        if self.request.data['type'] == 'callback_query':
+            if 'answer_callback' in self.answer.data:
+                answer_callback_query_data = self.prepare_request_data(
+                    callback_query_id=self.request.data['callback_query_id'], **self.answer.data['answer_callback'])
+            else:
+                answer_callback_query_data = self.prepare_request_data(
+                    callback_query_id=self.request.data['callback_query_id'], text="Request")
+            self.telegram_api.request("answerCallbackQuery", data=answer_callback_query_data)
+
+    def send_photo(self):
+        """
+
+        requirement:
+        file - file object
+
+        """
+        self.telegram_api.request("sendPhoto", data={'chat_id': self.request.data['chat_id']},
+                                  files=self.data['files'])
