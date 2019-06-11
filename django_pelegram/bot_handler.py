@@ -122,4 +122,4 @@ class BotBasic(object):
 
         """
         self.telegram_api.request("sendPhoto", data={'chat_id': self.request.data['chat_id']},
-                                  files=self.data['files'])
+                                  files=self.data['file'])
