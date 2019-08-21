@@ -122,7 +122,7 @@ class BotBasic(object):
 
         """
         self.telegram_api.request("sendPhoto", data={'chat_id': self.request.data['chat_id']},
-                                  files=self.data['file'])
+                                  files=self.answer.data['file'])
         if self.request.data['type'] == 'callback_query':
             if 'answer_callback' in self.answer.data:
                 answer_callback_query_data = self.prepare_request_data(
