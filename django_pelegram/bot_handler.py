@@ -147,6 +147,6 @@ class BotBasic(object):
         telegram_responses = {}
         send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
                                                       **self.answer.data['message'])
-        telegram_responses["editMessageText"] = self.telegram_request("sendMessage", data=send_message_data)
+        telegram_responses["editMessageText"] = self.telegram_request("editMessageText", data=send_message_data)
         telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
         return telegram_responses
