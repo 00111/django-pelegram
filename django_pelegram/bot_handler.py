@@ -1,6 +1,7 @@
-from django_pelegram.telegram import TelegramApi
-import re
 from django.http import JsonResponse
+from django.conf import settings
+import requests
+import re
 
 
 class Request(object):
@@ -21,7 +22,8 @@ class Request(object):
             'callback_query_id': self.payload['callback_query']['id'],
             'user': self.payload['callback_query']['from']['id'],
             'type': 'callback_query',
-            'testing_request': True if 'testing_request' in self.payload.keys() else False
+            'testing_request': True if 'testing_request' in self.payload.keys() else False,
+            'message_id': self.payload['callback_query']['message']['message_id']
         }
         return data
 
@@ -72,7 +74,7 @@ class Answer(object):
 class BotBasic(object):
 
     def __init__(self, payload=None, bot_token=None):
-        self.telegram_api = TelegramApi(bot_token)
+        self.bot_token = bot_token
         self.request = Request(payload)
         self.answer = Answer()
 
@@ -95,16 +97,12 @@ class BotBasic(object):
     def exception_template(self, err):
         return "Run-time error:\n{0}\n\nDELETE THIS OUTPUT FROM PRODUCTION!\n".format(err)
 
-    def send_message(self):
-        """
+    def telegram_request(self, method, **kwargs):
+        telegram_url = "{0}/bot{1}/".format(settings.TELEGRAM_API_URL, self.bot_token)
+        telegram_response = requests.post(telegram_url + method, **kwargs)
+        return telegram_response
 
-        requirement:
-        message
-
-        """
-        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
-                                                      **self.answer.data['message'])
-        self.telegram_api.request("sendMessage", data=send_message_data)
+    def answer_on_callback_query(self):
         if self.request.data['type'] == 'callback_query':
             if 'answer_callback' in self.answer.data:
                 answer_callback_query_data = self.prepare_request_data(
@@ -112,7 +110,24 @@ class BotBasic(object):
             else:
                 answer_callback_query_data = self.prepare_request_data(
                     callback_query_id=self.request.data['callback_query_id'], text="Request")
-            self.telegram_api.request("answerCallbackQuery", data=answer_callback_query_data)
+            response = self.telegram_request("answerCallbackQuery", data=answer_callback_query_data)
+        else:
+            response = None
+        return response
+
+    def send_message(self):
+        """
+
+        requirement:
+        message
+
+        """
+        telegram_responses = {}
+        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
+                                                      **self.answer.data['message'])
+        telegram_responses["sendMessage"] = self.telegram_request("sendMessage", data=send_message_data)
+        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
+        return telegram_responses
 
     def send_photo(self):
         """
@@ -121,14 +136,17 @@ class BotBasic(object):
         file - file object
 
         """
-        self.telegram_api.request("sendPhoto", data={'chat_id': self.request.data['chat_id']},
-                                  files=self.answer.data['file'])
-        if self.request.data['type'] == 'callback_query':
-            if 'answer_callback' in self.answer.data:
-                answer_callback_query_data = self.prepare_request_data(
-                    callback_query_id=self.request.data['callback_query_id'], **self.answer.data['answer_callback'])
-            else:
-                answer_callback_query_data = self.prepare_request_data(
-                    callback_query_id=self.request.data['callback_query_id'], text="Request")
-            self.telegram_api.request("answerCallbackQuery", data=answer_callback_query_data)
+        telegram_responses = dict()
+        telegram_responses["sendPhoto"] = self.telegram_request("sendPhoto",
+                                                                data={'chat_id': self.request.data['chat_id']},
+                                                                files=self.answer.data['file'])
+        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
+        return telegram_responses
 
+    def edit_message_text(self):
+        telegram_responses = {}
+        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
+                                                      **self.answer.data['message'])
+        telegram_responses["editMessageText"] = self.telegram_request("sendMessage", data=send_message_data)
+        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
+        return telegram_responses
