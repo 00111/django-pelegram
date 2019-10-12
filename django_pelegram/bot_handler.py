@@ -48,35 +48,12 @@ class Request(object):
         return data
 
 
-class Answer(object):
-
-    def __init__(self):
-        self._data = {}
-        self._action = None
-
-    @property
-    def action(self):
-        return self._action
-
-    @action.setter
-    def action(self, action_name):
-        self._action = action_name
-
-    @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, params):
-        self._data = params
-
-
 class BotBasic(object):
 
     def __init__(self, payload=None, bot_token=None):
         self.bot_token = bot_token
         self.request = Request(payload)
-        self.answer = Answer()
+        self.answer = {}
 
     def get_command(self):
         re_command = re.match(r'^/\w+', self.request.data['text'])
@@ -84,9 +61,6 @@ class BotBasic(object):
         if re_command:
             command = re_command.group().replace('/', '')
         return command
-
-    def prepare_request_data(self, **kwargs):
-        return dict(**kwargs)
 
     def dont_understand_message(self):
         return "Bot don't understand your command ¯\_(ツ)_/"
@@ -104,49 +78,40 @@ class BotBasic(object):
 
     def answer_on_callback_query(self):
         if self.request.data['type'] == 'callback_query':
-            if 'answer_callback' in self.answer.data:
-                answer_callback_query_data = self.prepare_request_data(
-                    callback_query_id=self.request.data['callback_query_id'], **self.answer.data['answer_callback'])
+            if 'answer_callback' in self.answer:
+                answer_callback_query_data = dict(callback_query_id=self.request.data['callback_query_id'],
+                                                  **self.answer['answer_callback'])
             else:
-                answer_callback_query_data = self.prepare_request_data(
-                    callback_query_id=self.request.data['callback_query_id'], text="Request")
+                answer_callback_query_data = dict(callback_query_id=self.request.data['callback_query_id'],
+                                                  text="Bot is typing")
             response = self.telegram_request("answerCallbackQuery", data=answer_callback_query_data)
         else:
             response = None
         return response
 
-    def send_message(self):
-        """
+    def send_answer(self):
+        answer_callback_response = self.answer_on_callback_query()
+        if answer_callback_response is None:
+            answer_responses = {}
+        else:
+            answer_responses = {"answer_callback": answer_callback_response}
+        messages_response = []
+        for message in self.answer['messages']:
+            response = self.processing_message_action(message)
+            messages_response.append(response)
+        answer_responses['messages'] = messages_response
+        return answer_responses
 
-        requirement:
-        message
-
-        """
-        telegram_responses = {}
-        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
-                                                      **self.answer.data['message'])
-        telegram_responses["sendMessage"] = self.telegram_request("sendMessage", data=send_message_data)
-        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
-        return telegram_responses
-
-    def send_photo(self):
-        """
-
-        requirement:
-        file - file object
-
-        """
-        telegram_responses = dict()
-        telegram_responses["sendPhoto"] = self.telegram_request("sendPhoto",
-                                                                data={'chat_id': self.request.data['chat_id']},
-                                                                files=self.answer.data['file'])
-        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
-        return telegram_responses
-
-    def edit_message_text(self):
-        telegram_responses = {}
-        send_message_data = self.prepare_request_data(chat_id=self.request.data['chat_id'],
-                                                      **self.answer.data['message'])
-        telegram_responses["editMessageText"] = self.telegram_request("editMessageText", data=send_message_data)
-        telegram_responses["answerCallbackQuery"] = self.answer_on_callback_query()
-        return telegram_responses
+    def processing_message_action(self, message):
+        handled_message = {'data': {}}
+        for key in message['data'].keys():
+            if key == 'file':
+                handled_message['files'] = {'photo': open(message.data['file'], 'rb')}
+            else:
+                handled_message['data'][key] = message['data'][key]
+        send_message_data = dict(chat_id=self.request.data['chat_id'], **handled_message['data'])
+        if 'files' in handled_message.keys():
+            response = self.telegram_request(message['action'], data=send_message_data, files=handled_message['files'])
+        else:
+            response = self.telegram_request(message['action'], data=send_message_data)
+        return response
