@@ -55,8 +55,9 @@ class BotBasic(object):
         self.request = Request(payload)
         self.answer = {}
 
-    def get_command(self):
-        re_command = re.match(r'^/\w+', self.request.data['text'])
+    def get_command(self, parse_text=''):
+        parse_string = self.request.data['text'] if parse_text == '' else parse_text
+        re_command = re.match(r'^/\w+', parse_string)
         command = ""
         if re_command:
             command = re_command.group().replace('/', '')
